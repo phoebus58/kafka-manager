@@ -54,8 +54,10 @@ POST        /clusters/:c/logkafkas/:h/:l/disableConfig    controllers.Logkafka.h
 POST        /clusters/:c/logkafkas/:h/:l/enableConfig     controllers.Logkafka.handleEnableConfig(c:String, h:String, l:String)
 GET         /api/status/:c/brokers                        controllers.api.KafkaStateCheck.brokers(c:String)
 GET         /api/status/:c/topics                         controllers.api.KafkaStateCheck.topics(c:String)
+GET         /api/status/:c/:t/groups                      controllers.api.KafkaStateCheck.consumerGroups(c:String,t:String)
 GET         /api/status/:c/:t/underReplicatedPartitions   controllers.api.KafkaStateCheck.underReplicatedPartitions(c:String,t:String)
 GET         /api/status/:c/:t/unavailablePartitions       controllers.api.KafkaStateCheck.unavailablePartitions(c:String,t:String)
+GET         /api/status/:c/:t/:cg/:ct/lag                 controllers.api.KafkaStateCheck.lag(c:String,t:String,cg:String,ct:String)
 
 # Versioned Assets
 GET         /vassets/*file          controllers.Assets.versioned(path="/public", file: Asset)
