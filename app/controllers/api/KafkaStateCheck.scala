@@ -7,10 +7,12 @@ package controllers.api
 
 import controllers.KafkaManagerContext
 import features.ApplicationFeatures
+import kafka.manager.utils.JsonHelpers
 import models.navigation.Menus
 import play.api.i18n.{I18nSupport, MessagesApi}
 import play.api.libs.json._
 import play.api.mvc._
+
 
 /**
  * @author jisookim0513
@@ -55,6 +57,29 @@ class KafkaStateCheck (val messagesApi: MessagesApi, val kafkaManagerContext: Ka
       errorOrTopicIdentity.fold(
         error => BadRequest(Json.obj("msg" -> error.msg)),
         topicIdentity => Ok(Json.obj("topic" -> t, "unavailablePartitions" -> topicIdentity.partitionsIdentity.filter(_._2.isr.isEmpty).map{case (num, pi) => pi.partNum}))
+      )
+    }
+  }
+
+  def consumerGroups(c: String, t: String) = Action.async { implicit request =>
+    kafkaManager.getConsumersForTopic(c, t).map { maybeTopics =>
+      maybeTopics.fold(BadRequest(Json.obj("msg" -> s"No consumers found for cluster $c and topic $t"))) { topics =>
+        val topicsJson = topics.map {
+          case (name, consumerType) => Json.obj("name" -> name, "type" -> consumerType.toString)
+        }
+
+        Ok(Json.obj("groups" -> topicsJson))
+      }
+    }
+  }
+
+  def lag(c: String, t: String, cg: String, ct: String) = Action.async { implicit request =>
+    import JsonHelpers._
+
+    kafkaManager.getConsumedTopicState(c, cg, t, ct).map { errorOrConsumedTopicState =>
+      errorOrConsumedTopicState.fold(
+        error => BadRequest(Json.obj("msg" -> error.msg)),
+        consumedTopicState => Ok(Json.obj("lag" -> consumedTopicState.totalLag.getOrElse(0L).toJsNumber))
       )
     }
   }
