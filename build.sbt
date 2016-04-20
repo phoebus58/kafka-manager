@@ -4,13 +4,6 @@
  */
 name := """kafka-manager"""
 
-/* For packaging purposes, -SNAPSHOT MUST contain a digit */
-version := "1.3.0.7"
-
-scalaVersion := "2.11.7"
-
-scalacOptions ++= Seq("-Xlint:-missing-interpolator","-Xfatal-warnings","-deprecation","-feature","-language:implicitConversions","-language:postfixOps")
-
 // From https://www.playframework.com/documentation/2.3.x/ProductionDist
 assemblyMergeStrategy in assembly := {
   case "logger.xml" => MergeStrategy.first
@@ -42,6 +35,30 @@ libraryDependencies ++= Seq(
   "com.yammer.metrics" % "metrics-core" % "2.2.0" force()
 )
 
+resourceGenerators in Compile <+= (resourceManaged in Compile) map { dir =>
+  def Try(command: String) = try { command.!! } catch { case e: Exception => command + " failed: " + e.getMessage }
+  try {
+    val targetDir = dir.getAbsolutePath + (if (dir.getAbsolutePath.endsWith("/")) "" else "/")
+    val targetFile = new File(targetDir + "build-info.conf")
+    val content = Seq(
+      ("hostname", Try("hostname")),
+      ("user", Try("id -u -n")),
+      ("timestamp", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US).format(new java.util.Date())),
+      ("gitBranch", Try("git rev-parse --abbrev-ref HEAD")),
+      ("gitCommit", Try("git rev-parse HEAD")),
+      ("circleRepository", sys.env.getOrElse("CIRCLE_PROJECT_REPONAME", default = "")),
+      ("circleBuildNumber", sys.env.getOrElse("CIRCLE_BUILD_NUM", default = "-1")),
+      ("circleInstigator", sys.env.getOrElse("CIRCLE_USERNAME", default = ""))
+    ) map {case (nm, value) => "%s=\"%s\"".format(nm.trim, value.trim) }
+    IO.write(targetFile, "build {\n" + content.mkString("  ", "\n  ", "\n") + "}\n")
+    Seq(targetFile)
+  } catch {
+    case e: Throwable =>
+      println("An error occurred in build.sbt while trying to generate build-info.conf")
+      throw e // need this otherwise because no valid return value
+  }
+}
+
 routesGenerator := InjectedRoutesGenerator
 
 LessKeys.compress in Assets := true
@@ -49,8 +66,6 @@ LessKeys.compress in Assets := true
 pipelineStages := Seq(digest, gzip)
 
 includeFilter in (Assets, LessKeys.less) := "*.less"
-
-lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 coverageExcludedPackages := "<empty>;controllers.*;views.*;models.*"
 
